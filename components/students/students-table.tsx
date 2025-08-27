@@ -10,30 +10,35 @@ import { MoreHorizontal, Search, Edit, Trash2 } from "lucide-react"
 
 interface Student {
   id: string
-  name: string
-  roll_number: string
-  course: string
-  completion_date: string
-  email?: string
-  phone?: string
-  grade?: string
+  salutation?: string
+  candidate_name: string
+  guardian_type?: string
+  name_of_father_husband?: string
+  adhaar?: string
+  job_role: string
+  training_center?: string
+  district?: string
+  state?: string
+  assessment_partner?: string
+  enrollment_number: string
+  certificate_number?: string
+  date_of_issuance: string
   created_at: string
 }
 
 interface StudentsTableProps {
   students: Student[]
-  onRefresh: () => void
 }
 
-export function StudentsTable({ students, onRefresh }: StudentsTableProps) {
+export function StudentsTable({ students }: StudentsTableProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
 
   const filteredStudents = students.filter(
     (student) =>
-      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.roll_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.course.toLowerCase().includes(searchTerm.toLowerCase()),
+      student.candidate_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.enrollment_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.job_role.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   const handleDelete = async (studentId: string) => {
@@ -49,7 +54,7 @@ export function StudentsTable({ students, onRefresh }: StudentsTableProps) {
         throw new Error("Failed to delete student")
       }
 
-      onRefresh()
+      window.location.reload()
     } catch (error) {
       console.error("Error deleting student:", error)
       alert("Failed to delete student")
@@ -77,12 +82,12 @@ export function StudentsTable({ students, onRefresh }: StudentsTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Roll Number</TableHead>
-              <TableHead>Course</TableHead>
-              <TableHead>Completion Date</TableHead>
-              <TableHead>Grade</TableHead>
-              <TableHead>Contact</TableHead>
+              <TableHead>Candidate Name</TableHead>
+              <TableHead>Enrollment Number</TableHead>
+              <TableHead>Job Role</TableHead>
+              <TableHead>Date of Issuance</TableHead>
+              <TableHead>Training Center</TableHead>
+              <TableHead>District/State</TableHead>
               <TableHead className="w-[70px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -96,15 +101,15 @@ export function StudentsTable({ students, onRefresh }: StudentsTableProps) {
             ) : (
               filteredStudents.map((student) => (
                 <TableRow key={student.id}>
-                  <TableCell className="font-medium">{student.name}</TableCell>
-                  <TableCell>{student.roll_number}</TableCell>
-                  <TableCell>{student.course}</TableCell>
-                  <TableCell>{new Date(student.completion_date).toLocaleDateString()}</TableCell>
-                  <TableCell>{student.grade && <Badge variant="outline">{student.grade}</Badge>}</TableCell>
+                  <TableCell className="font-medium">{student.candidate_name}</TableCell>
+                  <TableCell>{student.enrollment_number}</TableCell>
+                  <TableCell>{student.job_role}</TableCell>
+                  <TableCell>{new Date(student.date_of_issuance).toLocaleDateString()}</TableCell>
+                  <TableCell>{student.training_center && <Badge variant="outline">{student.training_center}</Badge>}</TableCell>
                   <TableCell>
                     <div className="text-sm">
-                      {student.email && <div>{student.email}</div>}
-                      {student.phone && <div className="text-muted-foreground">{student.phone}</div>}
+                      {student.district && <div>{student.district}</div>}
+                      {student.state && <div className="text-muted-foreground">{student.state}</div>}
                     </div>
                   </TableCell>
                   <TableCell>

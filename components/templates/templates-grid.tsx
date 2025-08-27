@@ -23,10 +23,9 @@ interface Template {
 
 interface TemplatesGridProps {
   templates: Template[]
-  onRefresh: () => void
 }
 
-export function TemplatesGrid({ templates, onRefresh }: TemplatesGridProps) {
+export function TemplatesGrid({ templates }: TemplatesGridProps) {
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [isToggling, setIsToggling] = useState<string | null>(null)
 
@@ -43,7 +42,7 @@ export function TemplatesGrid({ templates, onRefresh }: TemplatesGridProps) {
         throw new Error("Failed to delete template")
       }
 
-      onRefresh()
+      window.location.reload()
     } catch (error) {
       console.error("Error deleting template:", error)
       alert("Failed to delete template")
@@ -67,7 +66,7 @@ export function TemplatesGrid({ templates, onRefresh }: TemplatesGridProps) {
         throw new Error("Failed to update template status")
       }
 
-      onRefresh()
+      window.location.reload()
     } catch (error) {
       console.error("Error toggling template:", error)
       alert("Failed to update template status")

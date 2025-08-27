@@ -1,16 +1,14 @@
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_request: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   try {
-    const supabase = await createClient()
+    const { id } = await ctx.params
+    const supabase = createServiceClient()
 
     // Check if user is authenticated
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    const isAuthenticated = _request.cookies.get("isAuthenticated")?.value === "true"
+    if (!isAuthenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -18,7 +16,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const { data: template, error: fetchError } = await supabase
       .from("templates")
       .select("file_path, file_name, mime_type")
-      .eq("id", params.id)
+      .eq("id", id)
       .single()
 
     if (fetchError || !template) {
@@ -28,7 +26,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     // Get signed URL for download
     const { data: signedUrlData, error: urlError } = await supabase.storage
       .from("certificates")
-      .createSignedUrl(template.file_path, 60) // 1 minute expiry
+      .createSignedUrl(template.file_path, 60)
 
     if (urlError || !signedUrlData) {
       console.error("Signed URL error:", urlError)

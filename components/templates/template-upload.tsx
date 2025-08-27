@@ -12,11 +12,7 @@ import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Upload, FileImage, CheckCircle, AlertCircle } from "lucide-react"
 
-interface TemplateUploadProps {
-  onUploadComplete: () => void
-}
-
-export function TemplateUpload({ onUploadComplete }: TemplateUploadProps) {
+export function TemplateUpload() {
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [file, setFile] = useState<File | null>(null)
@@ -24,6 +20,7 @@ export function TemplateUpload({ onUploadComplete }: TemplateUploadProps) {
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [shouldRefresh, setShouldRefresh] = useState(false)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
@@ -81,7 +78,7 @@ export function TemplateUpload({ onUploadComplete }: TemplateUploadProps) {
 
       setProgress(100)
       setSuccess(true)
-      onUploadComplete()
+      setShouldRefresh(true)
 
       // Reset form
       setTimeout(() => {
@@ -183,6 +180,9 @@ export function TemplateUpload({ onUploadComplete }: TemplateUploadProps) {
             <Upload className="h-4 w-4 mr-2" />
             {isUploading ? "Uploading..." : "Upload Template"}
           </Button>
+          {shouldRefresh && (
+            <div className="text-xs text-muted-foreground text-center mt-2">Reload the page to see updates.</div>
+          )}
         </form>
       </CardContent>
     </Card>

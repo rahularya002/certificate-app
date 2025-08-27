@@ -33,8 +33,8 @@ export default async function StudentsPage() {
 
       <div className="flex-1 overflow-auto p-6">
         <div className="space-y-6">
-          <FileUpload onUploadComplete={() => window.location.reload()} />
-          <StudentsTable students={students || []} onRefresh={() => window.location.reload()} />
+          <FileUpload />
+          <StudentsTable students={students || []} />
         </div>
       </div>
     </div>

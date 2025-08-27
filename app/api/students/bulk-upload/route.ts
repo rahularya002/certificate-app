@@ -1,16 +1,12 @@
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Check if user is authenticated
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    const supabase = createServiceClient()
+    // Allow based on app's cookie-based auth (no Supabase auth session in this app)
+    const isAuthenticated = request.cookies.get("isAuthenticated")?.value === "true"
+    if (!isAuthenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -22,13 +18,19 @@ export async function POST(request: NextRequest) {
 
     // Prepare students data for insertion
     const studentsData = students.map((student: any) => ({
-      name: student.name,
-      roll_number: student.rollNumber,
-      course: student.course,
-      completion_date: new Date(student.completionDate).toISOString().split("T")[0],
-      email: student.email || null,
-      phone: student.phone || null,
-      grade: student.grade || null,
+      salutation: student.salutation || null,
+      candidate_name: student.candidate_name,
+      guardian_type: student.guardian_type || null,
+      name_of_father_husband: student.name_of_father_husband || null,
+      adhaar: student.adhaar || null,
+      job_role: student.job_role,
+      training_center: student.training_center || null,
+      district: student.district || null,
+      state: student.state || null,
+      assessment_partner: student.assessment_partner || null,
+      enrollment_number: student.enrollment_number,
+      certificate_number: student.certificate_number || null,
+      date_of_issuance: new Date(student.date_of_issuance).toISOString().split("T")[0],
     }))
 
     // Insert students into database

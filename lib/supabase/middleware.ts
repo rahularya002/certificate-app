@@ -17,11 +17,8 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Redirect authenticated users away from auth pages
-  if (isAuthenticated && request.nextUrl.pathname.startsWith("/auth")) {
-    const url = request.nextUrl.clone()
-    url.pathname = "/dashboard"
-    return NextResponse.redirect(url)
-  }
+  // Note: Do not redirect authenticated users away from auth pages here
+  // to avoid potential redirect loops with server components/layouts.
 
   return response
 }

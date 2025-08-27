@@ -10,12 +10,20 @@ import { Search, Users, X } from "lucide-react"
 
 interface Student {
   id: string
-  name: string
-  roll_number: string
-  course: string
-  completion_date: string
-  email?: string
-  grade?: string
+  salutation?: string
+  candidate_name: string
+  guardian_type?: string
+  name_of_father_husband?: string
+  adhaar?: string
+  job_role: string
+  training_center?: string
+  district?: string
+  state?: string
+  assessment_partner?: string
+  enrollment_number: string
+  certificate_number?: string
+  date_of_issuance: string
+  created_at: string
 }
 
 interface StudentSelectorProps {
@@ -30,14 +38,14 @@ export function StudentSelector({ students, selectedStudents, onSelectionChange 
 
   const filteredStudents = students.filter((student) => {
     const matchesSearch =
-      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.roll_number.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCourse = !courseFilter || student.course === courseFilter
+      student.candidate_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.enrollment_number.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesCourse = !courseFilter || student.job_role === courseFilter
 
     return matchesSearch && matchesCourse
   })
 
-  const uniqueCourses = Array.from(new Set(students.map((s) => s.course)))
+  const uniqueCourses = Array.from(new Set(students.map((s) => s.job_role)))
 
   const handleStudentToggle = (student: Student, checked: boolean) => {
     if (checked) {
@@ -110,7 +118,7 @@ export function StudentSelector({ students, selectedStudents, onSelectionChange 
             <div className="flex flex-wrap gap-2">
               {selectedStudents.map((student) => (
                 <Badge key={student.id} variant="default" className="flex items-center gap-1">
-                  {student.name}
+                  {student.candidate_name}
                   <X className="h-3 w-3 cursor-pointer" onClick={() => handleStudentToggle(student, false)} />
                 </Badge>
               ))}
@@ -129,10 +137,10 @@ export function StudentSelector({ students, selectedStudents, onSelectionChange 
                   onCheckedChange={(checked) => handleStudentToggle(student, checked as boolean)}
                 />
                 <div className="flex-1">
-                  <div className="font-medium">{student.name}</div>
+                  <div className="font-medium">{student.candidate_name}</div>
                   <div className="text-sm text-muted-foreground">
-                    {student.roll_number} • {student.course}
-                    {student.grade && ` • Grade: ${student.grade}`}
+                    {student.enrollment_number} • {student.job_role}
+                    {student.training_center && ` • ${student.training_center}`}
                   </div>
                 </div>
               </div>

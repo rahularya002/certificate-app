@@ -33,8 +33,8 @@ export default async function TemplatesPage() {
 
       <div className="flex-1 overflow-auto p-6">
         <div className="space-y-6">
-          <TemplateUpload onUploadComplete={() => window.location.reload()} />
-          <TemplatesGrid templates={templates || []} onRefresh={() => window.location.reload()} />
+          <TemplateUpload />
+          <TemplatesGrid templates={templates || []} />
         </div>
       </div>
     </div>
