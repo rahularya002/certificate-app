@@ -30,105 +30,105 @@ export interface CertificateConfig {
 // Configuration based on ICES certificate layout
 export const defaultCertificateConfig: CertificateConfig = {
   salutation: {
-    x: 300, // Center horizontally (595/2)
-    y: 650, // Top area for salutation (Mr/Ms)
-    fontSize: 16,
-    fontFamily: 'Helvetica',
-    color: [0, 0, 0], // Black
+    x: 100, // Center horizontally (595/2)
+    y: 260, // Top area for salutation (Mr/Ms)
+    fontSize: 14,
+    fontFamily: 'HelveticaBold',
+    color: [0.8, 0, 0], // Black
     maxWidth: 100,
   },
   candidateName: {
-    x: 300, // Center horizontally (595/2)
-    y: 580, // Below "This is to certify that" - main name area
-    fontSize: 20,
+    x: 130, // Center horizontally (595/2)
+    y: 260, // Below "This is to certify that" - main name area
+    fontSize: 14,
     fontFamily: 'HelveticaBold',
     color: [0.8, 0, 0], // Red color like in the example
     maxWidth: 450,
   },
   guardianType: {
-    x: 200, // Left side for guardian type
-    y: 540, // Below candidate name
+    x: 300, // Left side for guardian type
+    y: 260, // Below candidate name
     fontSize: 14,
-    fontFamily: 'Helvetica',
-    color: [0, 0, 0], // Black
+    fontFamily: 'HelveticaBold',
+    color: [0.8, 0, 0], // Black
     maxWidth: 150,
   },
   nameOfFatherHusband: {
-    x: 300, // Center horizontally
-    y: 540, // Below candidate name, next to "S/o"
+    x: 340, // Center horizontally
+    y: 260, // Below candidate name, next to "S/o"
     fontSize: 14,
-    fontFamily: 'Helvetica',
-    color: [0, 0, 0], // Black
+    fontFamily: 'HelveticaBold',
+    color: [0.8, 0, 0], // Black
     maxWidth: 450,
   },
   aadhaar: {
-    x: 400, // Right side, next to "having Adhaar"
-    y: 500, // Upper middle section
+    x: 620, // Right side, next to "having Adhaar"
+    y: 260, // Upper middle section
     fontSize: 12,
-    fontFamily: 'Helvetica',
-    color: [0, 0, 0], // Black
+    fontFamily: 'HelveticaBold',
+    color: [0.8, 0, 0], // Black
     maxWidth: 200,
   },
   jobRole: {
-    x: 300, // Center horizontally
-    y: 410, // Middle section, next to "job role"
+    x: 100, // Center horizontally
+    y: 315, // Middle section, next to "job role"
     fontSize: 16,
     fontFamily: 'HelveticaBold',
     color: [0.8, 0, 0], // Red color
-    maxWidth: 450,
+    maxWidth: 600,
   },
   trainingCenter: {
-    x: 300, // Center horizontally
-    y: 380, // Lower middle section, next to "Training Centre"
+    x: 280, // Center horizontally
+    y: 343, // Lower middle section, next to "Training Centre"
     fontSize: 14,
-    fontFamily: 'Helvetica',
-    color: [0, 0, 0], // Black
+    fontFamily: 'HelveticaBold',
+    color: [0.8, 0, 0], // Black
     maxWidth: 450,
   },
   district: {
-    x: 300, // Center horizontally
-    y: 360, // Below training center
+    x: 511, // Center horizontally
+    y: 343, // Below training center
     fontSize: 14,
-    fontFamily: 'Helvetica',
-    color: [0, 0, 0], // Black
+    fontFamily: 'HelveticaBold',
+    color: [0.8, 0, 0], // Black
     maxWidth: 450,
   },
   state: {
-    x: 300, // Center horizontally
-    y: 340, // Below district
+    x: 620, // Center horizontally
+    y: 342, // Below district
     fontSize: 14,
-    fontFamily: 'Helvetica',
-    color: [0, 0, 0], // Black
+    fontFamily: 'HelveticaBold',
+    color: [0.8, 0, 0], // Black
     maxWidth: 450,
   },
   assessmentPartner: {
-    x: 300, // Center horizontally
-    y: 320, // Below state
+    x: 465, // Center horizontally
+    y: 381, // Below state
     fontSize: 14,
-    fontFamily: 'Helvetica',
-    color: [0, 0, 0], // Black
+    fontFamily: 'HelveticaBold',
+    color: [0.8, 0, 0], // Black
     maxWidth: 450,
   },
   enrollmentNumber: {
-    x: 80, // Left side, bottom area
-    y: 200, // Above certificate number
-    fontSize: 12,
+    x: 122, // Left side, bottom area
+    y: 441, // Above certificate number
+    fontSize: 8,
     fontFamily: 'Helvetica',
-    color: [0, 0, 0], // Black
+    color: [0.8, 0, 0], // Black
   },
   certificateNumber: {
-    x: 80, // Left side, bottom area
-    y: 180, // Above date of issue
-    fontSize: 12,
+    x: 122, // Left side, bottom area
+    y: 454, // Above date of issue
+    fontSize: 8,
     fontFamily: 'Helvetica',
-    color: [0, 0, 0], // Black
+    color: [0.8, 0, 0], // Black
   },
   dateOfIssuance: {
-    x: 80, // Left side, bottom area
-    y: 160, // Bottom left, next to "Date of Issue"
-    fontSize: 14,
+    x: 220, // Left side, bottom area
+    y: 508, // Bottom left, next to "Date of Issue"
+    fontSize: 8,
     fontFamily: 'Helvetica',
-    color: [0, 0, 0], // Black
+    color: [0.8, 0, 0], // Black
     maxWidth: 300,
   },
 }
