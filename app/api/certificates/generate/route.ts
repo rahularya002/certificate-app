@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib"
 import { defaultCertificateConfig } from "@/lib/certificate-config"
+import QRCode from "qrcode"
 
 export async function POST(request: NextRequest) {
   try {
@@ -440,6 +441,32 @@ export async function POST(request: NextRequest) {
           console.log(`  ✓ Added certificate number: "${student.certificate_number}" at (${config.certificateNumber.x}, ${config.certificateNumber.y})`)
         }
 
+        // Build QR content text
+        const qrTextLines = [
+          `CERTIFICATE OF COMPLETION`,
+          `Name: ${student.candidate_name || ""}`,
+          `Father Name: ${student.name_of_father_husband || ""}`,
+          `Course Name(job role): ${student.job_role || ""}`,
+          `Date of Issuance: ${student.date_of_issuance ? new Date(student.date_of_issuance).toLocaleDateString('en-IN') : ""}`,
+          `Created & Maintained By: ICES`,
+        ]
+        const qrContent = qrTextLines.join("\n")
+
+        // Generate QR as PNG data URL
+        const qrDataUrl = await QRCode.toDataURL(qrContent, { margin: 0, scale: 6 })
+        const qrBase64 = qrDataUrl.split(",")[1] || ""
+        const qrPngBytes = Uint8Array.from(Buffer.from(qrBase64, "base64"))
+        const qrImage = await pdfDoc.embedPng(qrPngBytes)
+
+        // Draw QR image
+        const qrSize = config.qrCode.size
+        page.drawImage(qrImage, {
+          x: config.qrCode.x,
+          y: page.getHeight() - config.qrCode.y - qrSize,
+          width: qrSize,
+          height: qrSize,
+        })
+
         // Convert to bytes
         console.log("  Converting PDF to bytes...")
         const pdfBytes = await pdfDoc.save()
@@ -466,63 +493,58 @@ export async function POST(request: NextRequest) {
         }
         console.log("  ✅ PDF uploaded successfully to:", filePath)
 
-        // Check if certificate already exists
-        const { data: existingCertificate } = await supabase
-          .from("certificates")
-          .select("id")
-          .eq("student_id", student.id)
-          .eq("template_id", template.id)
-          .single()
+        // Generate a new unique certificate number
+        const { data: certNumData } = await supabase
+          .rpc('generate_certificate_number')
 
-        // Save certificate record to database
+        const generatedCertNumber = certNumData || `CERT-${Date.now()}`
+
+        // Save certificate record to database (always insert a new one)
         const certificateData = {
           student_id: student.id,
           template_id: template.id,
           file_path: filePath,
-          certificate_number: student.certificate_number || `CERT-${timestamp}`,
-          qr_code_data: "{}", // Required field - empty JSON object
+          certificate_number: generatedCertNumber,
+          qr_code_data: qrContent,
           // Remove duplicate student data - we'll fetch from students table when needed
           // enrollment_number: student.enrollment_number,
           // date_of_issuance: student.date_of_issuance,
         }
 
-        let certificateId: string
+        console.log("  Saving certificate record (update-then-insert)...")
+        const { data: updatedRows, error: updErr } = await supabase
+          .from("certificates")
+          .update(certificateData)
+          .eq("student_id", student.id)
+          .eq("template_id", template.id)
+          .select("id")
 
-        if (existingCertificate) {
-          console.log("  Updating existing certificate...")
-          // Update existing certificate
-          const { data: updatedCertificate, error: updateError } = await supabase
-            .from("certificates")
-            .update(certificateData)
-            .eq("id", existingCertificate.id)
-            .select("id")
-            .single()
+        let certificateId: string | null = null
+        if (updErr) {
+          console.log("  Update step error (may be no match):", updErr)
+        }
 
-          if (updateError) {
-            console.error("  ❌ Update error:", updateError)
-            continue
-          }
-          certificateId = updatedCertificate.id
-          console.log("  ✅ Certificate updated successfully")
+        if (updatedRows && updatedRows.length > 0) {
+          certificateId = updatedRows[0].id
+          console.log("  ✅ Updated existing certificate id:", certificateId)
         } else {
-          console.log("  Creating new certificate...")
-          // Insert new certificate
-          const { data: newCertificate, error: insertError } = await supabase
+          console.log("  No existing certificate, inserting new...")
+          const { data: inserted, error: insErr } = await supabase
             .from("certificates")
             .insert(certificateData)
             .select("id")
             .single()
 
-          if (insertError) {
-            console.error("  ❌ Insert error:", insertError)
+          if (insErr) {
+            console.error("  ❌ Insert error:", insErr)
             continue
           }
-          certificateId = newCertificate.id
-          console.log("  ✅ Certificate created successfully")
+          certificateId = inserted.id
+          console.log("  ✅ Inserted certificate id:", certificateId)
         }
 
         generatedCertificates.push({
-          id: certificateId,
+          id: certificateId!,
           studentName: student.candidate_name,
           certificateNumber: certificateData.certificate_number,
         })
