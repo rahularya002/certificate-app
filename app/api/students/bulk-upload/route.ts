@@ -16,12 +16,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid students data" }, { status: 400 })
     }
 
-    // Prepare students data for insertion
+    // Prepare students data for insertion (aligned with current DB schema)
     const studentsData = students.map((student: any) => ({
-      salutation: student.salutation || null,
+      // Removed: salutation, guardian_type, name_of_father_husband
       candidate_name: student.candidate_name,
-      guardian_type: student.guardian_type || null,
-      name_of_father_husband: student.name_of_father_husband || null,
       adhaar: student.adhaar || null,
       job_role: student.job_role,
       training_center: student.training_center || null,

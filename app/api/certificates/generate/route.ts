@@ -273,61 +273,34 @@ export async function POST(request: NextRequest) {
         // Add text fields based on certificate config
         const config = defaultCertificateConfig
 
-        // Salutation
-        if (student.salutation) {
-          page.drawText(student.salutation, {
-            x: config.salutation.x,
-            y: page.getHeight() - config.salutation.y,
-            size: config.salutation.fontSize,
-            font: getFont(config.salutation.fontFamily),
-            color: rgb(...config.salutation.color),
-            maxWidth: config.salutation.maxWidth,
-          })
-          console.log(`  ✓ Added salutation: "${student.salutation}" at (${config.salutation.x}, ${config.salutation.y})`)
-        }
-
-        // Candidate Name
-        if (student.candidate_name) {
-          page.drawText(student.candidate_name, {
-            x: config.candidateName.x,
-            y: page.getHeight() - config.candidateName.y,
-            size: config.candidateName.fontSize,
-            font: getFont(config.candidateName.fontFamily),
-            color: rgb(...config.candidateName.color),
-            maxWidth: config.candidateName.maxWidth,
-          })
-          console.log(`  ✓ Added candidate name: "${student.candidate_name}" at (${config.candidateName.x}, ${config.candidateName.y})`)
-        }
-
-        // Guardian Type
-        if (student.guardian_type) {
-          page.drawText(student.guardian_type, {
-            x: config.guardianType.x,
-            y: page.getHeight() - config.guardianType.y,
-            size: config.guardianType.fontSize,
-            font: getFont(config.guardianType.fontFamily),
-            color: rgb(...config.guardianType.color),
-            maxWidth: config.guardianType.maxWidth,
-          })
-          console.log(`  ✓ Added guardian type: "${student.guardian_type}" at (${config.guardianType.x}, ${config.guardianType.y})`)
-        }
-
-        // Name of Father/Husband
-        if (student.name_of_father_husband) {
-          page.drawText(student.name_of_father_husband, {
-            x: config.nameOfFatherHusband.x,
-            y: page.getHeight() - config.nameOfFatherHusband.y,
-            size: config.nameOfFatherHusband.fontSize,
-            font: getFont(config.nameOfFatherHusband.fontFamily),
-            color: rgb(...config.nameOfFatherHusband.color),
-            maxWidth: config.nameOfFatherHusband.maxWidth,
-          })
-          console.log(`  ✓ Added father/husband name: "${student.name_of_father_husband}" at (${config.nameOfFatherHusband.x}, ${config.nameOfFatherHusband.y})`)
+        // Candidate Name (combined: Salutation + CandidateName + guardian type + Father/Husband)
+        {
+          const parts: string[] = []
+          if (student.salutation) parts.push(String(student.salutation).trim())
+          if (student.candidate_name) parts.push(String(student.candidate_name).trim())
+          if (student.guardian_type && student.name_of_father_husband) {
+            parts.push(`${String(student.guardian_type).trim()} ${String(student.name_of_father_husband).trim()}`)
+          } else if (student.name_of_father_husband) {
+            // default to S/o if guardian_type absent
+            parts.push(`S/o ${String(student.name_of_father_husband).trim()}`)
+          }
+          const combinedName = parts.join(" ")
+          if (combinedName) {
+            page.drawText(combinedName, {
+              x: config.candidateName.x,
+              y: page.getHeight() - config.candidateName.y,
+              size: config.candidateName.fontSize,
+              font: getFont(config.candidateName.fontFamily),
+              color: rgb(...config.candidateName.color),
+              maxWidth: config.candidateName.maxWidth,
+            })
+            console.log(`  ✓ Added combined candidate name: "${combinedName}" at (${config.candidateName.x}, ${config.candidateName.y})`)
+          }
         }
 
         // Aadhaar
         if (student.adhaar) {
-          page.drawText(student.adhaar, {
+          page.drawText(String(student.adhaar), {
             x: config.aadhaar.x,
             y: page.getHeight() - config.aadhaar.y,
             size: config.aadhaar.fontSize,

@@ -17,14 +17,11 @@ export interface CertificateConfig {
   dateOfIssuance: CertificateField
   certificateNumber: CertificateField
   enrollmentNumber: CertificateField
-  nameOfFatherHusband: CertificateField
   aadhaar: CertificateField
   trainingCenter: CertificateField
   assessmentPartner: CertificateField
   district: CertificateField
   state: CertificateField
-  salutation: CertificateField
-  guardianType: CertificateField
   // Position and size (in points) for QR image placement
   qrCode: {
     x: number
@@ -35,113 +32,89 @@ export interface CertificateConfig {
 
 // Configuration based on ICES certificate layout
 export const defaultCertificateConfig: CertificateConfig = {
-  salutation: {
-    x: 130, // Center horizontally (595/2)
-    y: 261, // Top area for salutation (Mr/Ms)
-    fontSize: 14,
-    fontFamily: 'HelveticaBold',
-    color: [0, 0, 0], // Black
-    maxWidth: 100,
-  },
   candidateName: {
-    x: 155, // Center horizontally (595/2)
-    y: 261, // Below "This is to certify that" - main name area
+    x: 175,
+    y: 261,
     fontSize: 14,
     fontFamily: 'HelveticaBold',
-    color: [0, 0, 0], // Red color like in the example
-    maxWidth: 450,
-  },
-  guardianType: {
-    x: 340, // Left side for guardian type
-    y: 261, // Below candidate name
-    fontSize: 14,
-    fontFamily: 'HelveticaBold',
-    color: [0, 0, 0], // Black
-    maxWidth: 150,
-  },
-  nameOfFatherHusband: {
-    x: 380, // Center horizontally
-    y: 261, // Below candidate name, next to "S/o"
-    fontSize: 14,
-    fontFamily: 'HelveticaBold',
-    color: [0, 0, 0], // Black
+    color: [0, 0, 0],
     maxWidth: 450,
   },
   aadhaar: {
-    x: 600, // Right side, next to "having Adhaar"
-    y: 261, // Upper middle section
+    x: 600,
+    y: 261,
     fontSize: 12,
     fontFamily: 'HelveticaBold',
-    color: [0, 0, 0], // Black
+    color: [0, 0, 0],
     maxWidth: 200,
   },
   jobRole: {
-    x: 120, // Center horizontally
-    y: 322, // Middle section, next to "job role"
+    x: 120,
+    y: 322,
     fontSize: 16,
     fontFamily: 'HelveticaBold',
-    color: [0, 0, 0], // Red color
+    color: [0, 0, 0],
     maxWidth: 600,
   },
   trainingCenter: {
-    x: 230, // Center horizontally
-    y: 352, // Lower middle section, next to "Training Centre"
+    x: 230,
+    y: 352,
     fontSize: 14,
     fontFamily: 'HelveticaBold',
-    color: [0, 0, 0], // Black
+    color: [0, 0, 0],
     maxWidth: 450,
   },
   district: {
-    x: 463, // Center horizontally
-    y: 352, // Below training center
+    x: 463,
+    y: 352,
     fontSize: 14,
     fontFamily: 'HelveticaBold',
-    color: [0, 0, 0], // Black
+    color: [0, 0, 0],
     maxWidth: 450,
   },
   state: {
-    x: 565, // Center horizontally
-    y: 352, // Below district
+    x: 565,
+    y: 352,
     fontSize: 14,
     fontFamily: 'HelveticaBold',
-    color: [0, 0, 0], // Black
+    color: [0, 0, 0],
     maxWidth: 450,
   },
   assessmentPartner: {
-    x: 330, // Center horizontally
-    y: 390, // Below state
+    x: 330,
+    y: 390,
     fontSize: 14,
     fontFamily: 'HelveticaBold',
-    color: [0, 0, 0], // Black
+    color: [0, 0, 0],
     maxWidth: 450,
   },
   enrollmentNumber: {
-    x: 123, // Left side, bottom area
-    y: 449, // Above certificate number
+    x: 123,
+    y: 449,
     fontSize: 8,
     fontFamily: 'Helvetica',
-    color: [0, 0, 0], // Black
+    color: [0, 0, 0],
   },
   certificateNumber: {
-    x: 122, // Left side, bottom area
-    y: 462, // Above date of issue
+    x: 122,
+    y: 462,
     fontSize: 8,
     fontFamily: 'Helvetica',
-    color: [0, 0, 0], // Black
+    color: [0, 0, 0],
   },
   dateOfIssuance: {
-    x: 220, // Left side, bottom area
-    y: 517, // Bottom left, next to "Date of Issue"
+    x: 220,
+    y: 517,
     fontSize: 8,
     fontFamily: 'Helvetica',
-    color: [0, 0, 0], // Black
+    color: [0, 0, 0],
     maxWidth: 300,
   },
   // Default QR code placement (adjust to match your template)
   qrCode: {
-    x: 70, // Right bottom area
-    y: 480, // Distance from top if following existing drawText inversion
-    size: 90, // Width and height in points
+    x: 70,
+    y: 480,
+    size: 90,
   },
 }
 
