@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     // Get template PDF
     const { data: templatePdfBytes, error: templatePdfError } = await supabase.storage
-      .from("templates")
+      .from("certificates")
       .download(template.file_path)
 
     if (templatePdfError || !templatePdfBytes) {
@@ -264,28 +264,16 @@ export async function POST(request: NextRequest) {
                   height: qrCodeDims.height,
                 })
 
-                // Save and upload
+                // Save PDF
                 const pdfBytes = await pdfDoc.save()
                 const timestamp = Date.now()
                 const fileName = `${student.candidate_name?.replace(/[^a-zA-Z0-9]/g, "_") || "STUDENT"}_${timestamp}.pdf`
-                const filePath = `generated/${fileName}`
 
-                const { error: uploadError } = await supabase.storage
-                  .from("certificates")
-                  .upload(filePath, pdfBytes, {
-                    contentType: "application/pdf",
-                    upsert: true,
-                  })
-
-                if (uploadError) {
-                  throw new Error(`Upload failed: ${uploadError.message}`)
-                }
-
-                // Prepare records
+                // Prepare records (without file_path since we're not storing)
                 const certificateData = {
                   student_id: student.id,
                   template_id: template.id,
-                  file_path: filePath,
+                  file_path: null, // No file path since we're not storing
                   certificate_number: certificateNumber,
                   qr_code_data: qrContent,
                 }
@@ -294,20 +282,45 @@ export async function POST(request: NextRequest) {
                 allGeneratedCertificates.push({
                   studentId: student.id,
                   studentName: student.candidate_name,
-                  filePath: filePath,
+                  fileName: fileName,
                   certificateNumber: certificateNumber,
+                  pdfBytes: pdfBytes, // Store the actual PDF bytes
                   id: null,
                 })
 
                 totalGenerated++
 
-                // Send student success
+                // Send student success (without PDF data to avoid JSON truncation)
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({
                   type: 'student_success',
                   studentName: student.candidate_name,
                   totalGenerated,
-                  totalStudents: students.length
+                  totalStudents: students.length,
+                  certificateNumber: certificateNumber,
+                  fileName: fileName
                 })}\n\n`))
+
+                // Send PDF data in chunks to avoid JSON size limits
+                const pdfBase64 = Buffer.from(pdfBytes).toString('base64')
+                const chunkSize = 10000 // 10KB chunks
+                const chunks = Math.ceil(pdfBase64.length / chunkSize)
+                
+                for (let chunkIndex = 0; chunkIndex < chunks; chunkIndex++) {
+                  const start = chunkIndex * chunkSize
+                  const end = Math.min(start + chunkSize, pdfBase64.length)
+                  const chunk = pdfBase64.substring(start, end)
+                  
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                    type: 'pdf_chunk',
+                    studentId: student.id,
+                    studentName: student.candidate_name,
+                    fileName: fileName,
+                    certificateNumber: certificateNumber,
+                    chunkIndex: chunkIndex,
+                    totalChunks: chunks,
+                    chunk: chunk
+                  })}\n\n`))
+                }
 
               } catch (error) {
                 // Send student error
@@ -348,11 +361,10 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Send final success
+          // Send final success (without PDF data to avoid JSON truncation)
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
             type: 'complete',
             success: true,
-            generatedCertificates: allGeneratedCertificates,
             totalGenerated: allGeneratedCertificates.length,
             totalStudents: students.length,
           })}\n\n`))

@@ -42,6 +42,8 @@ export function GenerationPreview({ selectedStudents, selectedTemplate, onGenera
   const [progress, setProgress] = useState(0)
   const [generatedCertificates, setGeneratedCertificates] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [currentStudent, setCurrentStudent] = useState<string | null>(null)
+  const [totalGenerated, setTotalGenerated] = useState(0)
 
   const canGenerate = selectedStudents.length > 0 && selectedTemplate
 
@@ -52,6 +54,8 @@ export function GenerationPreview({ selectedStudents, selectedTemplate, onGenera
     setProgress(0)
     setError(null)
     setGeneratedCertificates([])
+    setCurrentStudent(null)
+    setTotalGenerated(0)
 
     try {
       const response = await fetch("/api/certificates/generate", {
@@ -71,9 +75,15 @@ export function GenerationPreview({ selectedStudents, selectedTemplate, onGenera
       }
 
       const result = await response.json()
-      setGeneratedCertificates(result.generatedCertificates || [])
-      setProgress(100)
-      onGenerate()
+      
+      if (result.success) {
+        setGeneratedCertificates(result.generatedCertificates || [])
+        setProgress(100)
+        setTotalGenerated(result.totalGenerated || 0)
+        onGenerate()
+      } else {
+        throw new Error(result.error || "Failed to generate certificates")
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
@@ -85,20 +95,22 @@ export function GenerationPreview({ selectedStudents, selectedTemplate, onGenera
     if (!generatedCertificates || generatedCertificates.length === 0) return
 
     try {
-      const response = await fetch("/api/certificates/download-batch", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          certificateIds: generatedCertificates.filter((c) => c.id).map((c) => c.id),
-        }),
+      // Create ZIP file directly from the PDF data
+      const JSZip = (await import('jszip')).default
+      const zip = new JSZip()
+
+      // Add each certificate to the ZIP
+      generatedCertificates.forEach((cert: any) => {
+        if (cert.pdfData) {
+          // Convert base64 back to binary
+          const pdfBytes = Uint8Array.from(atob(cert.pdfData), c => c.charCodeAt(0))
+          zip.file(`${cert.fileName || `${cert.studentName}_${cert.certificateNumber}.pdf`}`, pdfBytes)
+        }
       })
 
-      if (!response.ok) throw new Error("Failed to download certificates")
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
+      // Generate and download ZIP
+      const zipBlob = await zip.generateAsync({ type: 'blob' })
+      const url = window.URL.createObjectURL(zipBlob)
       const a = document.createElement("a")
       a.href = url
       a.download = `certificates-${new Date().toISOString().split("T")[0]}.zip`
@@ -146,9 +158,19 @@ export function GenerationPreview({ selectedStudents, selectedTemplate, onGenera
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Generating certificates...
               </span>
-              <span>{progress}%</span>
+              <span>{progress.toFixed(1)}%</span>
             </div>
             <Progress value={progress} />
+            {currentStudent && (
+              <div className="text-xs text-muted-foreground">
+                Processing: {currentStudent}
+              </div>
+            )}
+            {totalGenerated > 0 && (
+              <div className="text-xs text-muted-foreground">
+                Generated: {totalGenerated} of {selectedStudents.length}
+              </div>
+            )}
           </div>
         )}
 
@@ -202,8 +224,31 @@ export function GenerationPreview({ selectedStudents, selectedTemplate, onGenera
               {generatedCertificates.map((cert: any) => (
                 <div key={cert.studentId} className="flex items-center justify-between text-sm p-2 rounded border">
                   <span>{cert.studentName}</span>
-                  <div className="text-muted-foreground text-right">
-                    <div>{cert.certificateNumber}</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-muted-foreground text-right">
+                      <div>{cert.certificateNumber}</div>
+                    </div>
+                    {cert.pdfData && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          // Download individual certificate
+                          const pdfBytes = Uint8Array.from(atob(cert.pdfData), c => c.charCodeAt(0))
+                          const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+                          const url = window.URL.createObjectURL(blob)
+                          const a = document.createElement("a")
+                          a.href = url
+                          a.download = cert.fileName || `${cert.studentName}_${cert.certificateNumber}.pdf`
+                          document.body.appendChild(a)
+                          a.click()
+                          window.URL.revokeObjectURL(url)
+                          document.body.removeChild(a)
+                        }}
+                      >
+                        <Download className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}

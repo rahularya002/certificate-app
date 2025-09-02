@@ -95,32 +95,9 @@ async function getTemplatePDF(supabase: any, template: any): Promise<ArrayBuffer
   console.log("📥 Downloading fresh template PDF")
   
   // Get signed URL for the template PDF file
-  let signedUrlData, signedUrlError
-  try {
-    const result = await supabase.storage
-      .from("templates")
-      .createSignedUrl(template.file_path, 120)
-    signedUrlData = result.data
-    signedUrlError = result.error
-  } catch (e) {
-    console.log("Error with 'templates' bucket:", e)
-    signedUrlError = e
-  }
-
-  // If templates bucket fails, try certificates bucket
-  if (signedUrlError || !signedUrlData?.signedUrl) {
-    console.log("Trying 'certificates' bucket as fallback...")
-    try {
-      const result = await supabase.storage
-        .from("certificates")
-        .createSignedUrl(template.file_path, 120)
-      signedUrlData = result.data
-      signedUrlError = result.error
-    } catch (e) {
-      console.log("Error with 'certificates' bucket:", e)
-      signedUrlError = e
-    }
-  }
+  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+    .from("certificates")
+    .createSignedUrl(template.file_path, 120)
 
   if (signedUrlError || !signedUrlData?.signedUrl) {
     throw new Error("Failed to access template PDF")
@@ -545,43 +522,28 @@ export async function POST(request: NextRequest) {
           const pdfBytes = await pdfDoc.save()
           console.log("  PDF converted, size:", pdfBytes.byteLength, "bytes")
 
-          // Generate unique filename
+          // Generate unique filename for reference
           const timestamp = Date.now()
           const fileName = `${student.candidate_name?.replace(/[^a-zA-Z0-9]/g, "_") || "STUDENT"}_${timestamp}.pdf`
-          const filePath = `generated/${fileName}`
           console.log("  Generated filename:", fileName)
 
-          // Upload to Supabase storage (use same bucket as template downloads: "certificates")
-          console.log("  Uploading to Supabase storage...")
-          const { error: uploadError } = await supabase.storage
-            .from("certificates")
-            .upload(filePath, pdfBytes, {
-              contentType: "application/pdf",
-              upsert: true,
-            })
-
-          if (uploadError) {
-            console.error("  ❌ Upload error:", uploadError)
-            continue
-          }
-          console.log("  ✅ PDF uploaded successfully to:", filePath)
-
-          // Prepare certificate record for batch insert
+          // Prepare certificate record for batch insert (without file_path since we're not storing)
           const certificateData = {
             student_id: student.id,
             template_id: template.id,
-            file_path: filePath,
+            file_path: null, // No file path since we're not storing
             certificate_number: certificateNumber,
             qr_code_data: qrContent,
           }
 
           allCertificateRecords.push(certificateData)
-          // We'll add the certificate ID after database insertion
+          // Store the PDF bytes for return
           allGeneratedCertificates.push({
             studentId: student.id,
             studentName: student.candidate_name,
-            filePath: filePath,
+            fileName: fileName,
             certificateNumber: certificateNumber,
+            pdfBytes: pdfBytes, // Store the actual PDF bytes
             // Temporary placeholder - will be updated after DB insertion
             id: null,
           })
@@ -632,7 +594,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      generatedCertificates: allGeneratedCertificates,
+      generatedCertificates: allGeneratedCertificates.map(cert => ({
+        studentId: cert.studentId,
+        studentName: cert.studentName,
+        fileName: cert.fileName,
+        certificateNumber: cert.certificateNumber,
+        id: cert.id,
+        // Convert PDF bytes to base64 for JSON transmission
+        pdfData: Buffer.from(cert.pdfBytes).toString('base64')
+      })),
       totalGenerated: allGeneratedCertificates.length,
       totalStudents: students.length,
     })

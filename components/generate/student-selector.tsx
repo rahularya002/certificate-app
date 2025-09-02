@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Search, Users, X } from "lucide-react"
+import { Search, Users, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
 
 interface Student {
   id: string
@@ -32,9 +32,12 @@ interface StudentSelectorProps {
   onSelectionChange: (students: Student[]) => void
 }
 
+const ITEMS_PER_PAGE = 100
+
 export function StudentSelector({ students, selectedStudents, onSelectionChange }: StudentSelectorProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [courseFilter, setCourseFilter] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
 
   const filteredStudents = students.filter((student) => {
     const matchesSearch =
@@ -44,6 +47,11 @@ export function StudentSelector({ students, selectedStudents, onSelectionChange 
 
     return matchesSearch && matchesCourse
   })
+
+  const totalPages = Math.ceil(filteredStudents.length / ITEMS_PER_PAGE)
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const currentPageStudents = filteredStudents.slice(startIndex, endIndex)
 
   const uniqueCourses = Array.from(new Set(students.map((s) => s.job_role)))
 
@@ -55,13 +63,34 @@ export function StudentSelector({ students, selectedStudents, onSelectionChange 
     }
   }
 
-  const handleSelectAll = () => {
-    onSelectionChange(filteredStudents)
+  const handleSelectAllCurrentPage = () => {
+    const newSelected = [...selectedStudents]
+    currentPageStudents.forEach((student) => {
+      if (!newSelected.some((s) => s.id === student.id)) {
+        newSelected.push(student)
+      }
+    })
+    onSelectionChange(newSelected)
+  }
+
+  const handleClearAllCurrentPage = () => {
+    const newSelected = selectedStudents.filter(
+      (student) => !currentPageStudents.some((s) => s.id === student.id)
+    )
+    onSelectionChange(newSelected)
   }
 
   const handleClearAll = () => {
     onSelectionChange([])
   }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+  }
+
+  const selectedOnCurrentPage = currentPageStudents.filter((student) =>
+    selectedStudents.some((s) => s.id === student.id)
+  ).length
 
   return (
     <Card>
@@ -70,7 +99,9 @@ export function StudentSelector({ students, selectedStudents, onSelectionChange 
           <Users className="h-5 w-5" />
           Select Students
         </CardTitle>
-        <CardDescription>Choose students to generate certificates for</CardDescription>
+        <CardDescription>
+          Choose students to generate certificates for (100 per page)
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Search and Filters */}
@@ -98,37 +129,123 @@ export function StudentSelector({ students, selectedStudents, onSelectionChange 
           </select>
         </div>
 
+        {/* Pagination Info */}
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredStudents.length)} of {filteredStudents.length} students
+          </span>
+          <span>Page {currentPage} of {totalPages}</span>
+        </div>
+
         {/* Selection Actions */}
         <div className="flex items-center justify-between">
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleSelectAll}>
-              Select All ({filteredStudents.length})
+            <Button variant="outline" size="sm" onClick={handleSelectAllCurrentPage}>
+              Select All on Page ({currentPageStudents.length})
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleClearAllCurrentPage}>
+              Clear Page ({selectedOnCurrentPage})
             </Button>
             <Button variant="outline" size="sm" onClick={handleClearAll}>
-              Clear All
+              Clear All ({selectedStudents.length})
             </Button>
           </div>
-          <Badge variant="secondary">{selectedStudents.length} selected</Badge>
+          <Badge variant="secondary">{selectedStudents.length} total selected</Badge>
         </div>
 
-        {/* Selected Students */}
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum
+                if (totalPages <= 5) {
+                  pageNum = i + 1
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i
+                } else {
+                  pageNum = currentPage - 2 + i
+                }
+
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handlePageChange(pageNum)}
+                    className="w-8 h-8 p-0"
+                  >
+                    {pageNum}
+                  </Button>
+                )
+              })}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(totalPages)}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Selected Students Summary */}
         {selectedStudents.length > 0 && (
           <div className="space-y-2">
-            <h4 className="text-sm font-medium">Selected Students:</h4>
-            <div className="flex flex-wrap gap-2">
-              {selectedStudents.map((student) => (
-                <Badge key={student.id} variant="default" className="flex items-center gap-1">
-                  {student.candidate_name}
-                  <X className="h-3 w-3 cursor-pointer" onClick={() => handleStudentToggle(student, false)} />
-                </Badge>
-              ))}
+            <h4 className="text-sm font-medium">Selected Students ({selectedStudents.length}):</h4>
+            <div className="max-h-20 overflow-y-auto">
+              <div className="flex flex-wrap gap-2">
+                {selectedStudents.slice(0, 10).map((student) => (
+                  <Badge key={student.id} variant="default" className="flex items-center gap-1">
+                    {student.candidate_name}
+                    <X className="h-3 w-3 cursor-pointer" onClick={() => handleStudentToggle(student, false)} />
+                  </Badge>
+                ))}
+                {selectedStudents.length > 10 && (
+                  <Badge variant="secondary">+{selectedStudents.length - 10} more</Badge>
+                )}
+              </div>
             </div>
           </div>
         )}
 
         {/* Student List */}
-        <div className="max-h-64 overflow-y-auto space-y-2">
-          {filteredStudents.map((student) => {
+        <div className="max-h-96 overflow-y-auto space-y-2">
+          {currentPageStudents.map((student) => {
             const isSelected = selectedStudents.some((s) => s.id === student.id)
             return (
               <div key={student.id} className="flex items-center space-x-3 p-2 rounded-lg border">
@@ -148,8 +265,8 @@ export function StudentSelector({ students, selectedStudents, onSelectionChange 
           })}
         </div>
 
-        {filteredStudents.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">No students found</div>
+        {currentPageStudents.length === 0 && (
+          <div className="text-center py-8 text-muted-foreground">No students found on this page</div>
         )}
       </CardContent>
     </Card>

@@ -8,12 +8,20 @@ import { GenerationPreview } from "@/components/generate/generation-preview"
 
 interface Student {
   id: string
-  name: string
-  roll_number: string
-  course: string
-  completion_date: string
-  email?: string
-  grade?: string
+  salutation?: string
+  candidate_name: string
+  guardian_type?: string
+  name_of_father_husband?: string
+  adhaar?: string
+  job_role: string
+  training_center?: string
+  district?: string
+  state?: string
+  assessment_partner?: string
+  enrollment_number: string
+  certificate_number?: string
+  date_of_issuance: string
+  created_at: string
 }
 
 interface Template {
