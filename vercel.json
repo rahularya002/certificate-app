@@ -4,7 +4,10 @@
       "maxDuration": 60
     },
     "app/api/certificates/generate/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
+    },
+    "app/api/certificates/generate-stream/route.ts": {
+      "maxDuration": 300
     },
     "app/api/certificates/download-batch/route.ts": {
       "maxDuration": 60
