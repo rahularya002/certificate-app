@@ -9,6 +9,7 @@ export interface CertificateField {
   fontFamily: 'Helvetica' | 'HelveticaBold' | 'TimesRoman' | 'TimesRomanBold'
   color: [number, number, number] // RGB values 0-1
   maxWidth?: number // Optional max width for text wrapping
+  align?: 'left' | 'center' | 'right' // Text alignment (default: left)
 }
 
 export interface CertificateConfig {
@@ -17,7 +18,6 @@ export interface CertificateConfig {
   dateOfIssuance: CertificateField
   certificateNumber: CertificateField
   enrollmentNumber: CertificateField
-  aadhaar: CertificateField
   trainingCenter: CertificateField
   assessmentPartner: CertificateField
   district: CertificateField
@@ -33,28 +33,22 @@ export interface CertificateConfig {
 // Configuration based on ICES certificate layout
 export const defaultCertificateConfig: CertificateConfig = {
   candidateName: {
-    x: 175,
+    x: 0, // Not used when align='center' - will be calculated dynamically
     y: 261,
     fontSize: 14,
     fontFamily: 'HelveticaBold',
     color: [0, 0, 0],
-    maxWidth: 450,
-  },
-  aadhaar: {
-    x: 600,
-    y: 261,
-    fontSize: 12,
-    fontFamily: 'HelveticaBold',
-    color: [0, 0, 0],
-    maxWidth: 200,
+    maxWidth: 800, // Wider to accommodate full name + aadhaar
+    align: 'center', // Center-aligned for the complete line
   },
   jobRole: {
-    x: 120,
+    x: 0, // Not used when align='center' - will be calculated dynamically
     y: 322,
     fontSize: 16,
     fontFamily: 'HelveticaBold',
     color: [0, 0, 0],
     maxWidth: 600,
+    align: 'center',
   },
   trainingCenter: {
     x: 230,
@@ -118,12 +112,51 @@ export const defaultCertificateConfig: CertificateConfig = {
   },
 }
 
-// Helper function to center text horizontally
-export function centerText(text: string, fontSize: number, fontFamily: string, pageWidth: number = 595): number {
-  // Approximate character width (this is a rough estimate)
-  const charWidth = fontSize * 0.6
-  const textWidth = text.length * charWidth
-  return (pageWidth - textWidth) / 2
+// Helper function to calculate text width
+export function getTextWidth(text: string, fontSize: number, fontFamily: string): number {
+  // Approximate character width based on font and size
+  let avgCharWidth: number
+  
+  switch (fontFamily) {
+    case 'HelveticaBold':
+    case 'TimesRomanBold':
+      avgCharWidth = fontSize * 0.65 // Bold fonts are wider
+      break
+    case 'TimesRoman':
+      avgCharWidth = fontSize * 0.58 // Times is slightly narrower
+      break
+    default: // Helvetica
+      avgCharWidth = fontSize * 0.6
+      break
+  }
+  
+  return text.length * avgCharWidth
+}
+
+// Helper function to calculate aligned x position
+export function getAlignedX(
+  text: string, 
+  baseX: number, 
+  fontSize: number, 
+  fontFamily: string, 
+  align: 'left' | 'center' | 'right' = 'left',
+  maxWidth?: number
+): number {
+  if (align === 'left') {
+    return baseX
+  }
+  
+  const textWidth = getTextWidth(text, fontSize, fontFamily)
+  const effectiveWidth = maxWidth || textWidth
+  
+  switch (align) {
+    case 'center':
+      return baseX - (textWidth / 2)
+    case 'right':
+      return baseX - textWidth
+    default:
+      return baseX
+  }
 }
 
 // Helper function to get font from pdf-lib

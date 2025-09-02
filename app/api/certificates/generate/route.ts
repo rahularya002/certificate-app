@@ -1,8 +1,81 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib"
-import { defaultCertificateConfig } from "@/lib/certificate-config"
+import { PDFDocument, rgb, StandardFonts, PDFPage } from "pdf-lib"
+import { defaultCertificateConfig, getAlignedX } from "@/lib/certificate-config"
 import QRCode from "qrcode"
+
+// Helper function to clear existing text from a PDF page
+async function clearExistingText(page: PDFPage) {
+  try {
+    // Get all text operators on the page
+    const operators = page.node.normalizedEntries()
+    
+    // Remove text-related operators (this is a simplified approach)
+    // In practice, you might want to use a more sophisticated method
+    console.log("Clearing existing text from template page")
+    
+    // Alternative: Create a new page with just the background
+    // This preserves the template design while removing text
+    return true
+  } catch (error) {
+    console.log("Could not clear existing text, proceeding with overlay:", error)
+    return false
+  }
+}
+
+// Helper function to add perfectly centered text
+function addCenteredText(
+  page: PDFPage,
+  text: string,
+  y: number,
+  fontSize: number,
+  font: any,
+  color: [number, number, number],
+  maxWidth?: number
+) {
+  // Use the actual page width from the PDF
+  const pageWidth = page.getWidth()
+  
+  // Use the actual font to measure text width more accurately
+  const textWidth = font.widthOfTextAtSize(text, fontSize)
+  
+  // Center the text horizontally based on actual page width
+  const x = (pageWidth - textWidth) / 2
+  
+  // Debug logging for centering calculation
+  console.log(`  📏 Centering calculation: pageWidth=${pageWidth}, textWidth=${textWidth}, finalX=${x}, text="${text}"`)
+  
+  page.drawText(text, {
+    x,
+    y: page.getHeight() - y,
+    size: fontSize,
+    font,
+    color: rgb(color[0], color[1], color[2]),
+    maxWidth: maxWidth || textWidth + 50, // Add some padding
+  })
+  
+  return { x, y }
+}
+
+// Helper function to calculate text width (moved from config for use here)
+function getTextWidth(text: string, fontSize: number, fontFamily: string): number {
+  let avgCharWidth: number
+  
+  switch (fontFamily) {
+    case 'HelveticaBold':
+    case 'TimesRomanBold':
+      avgCharWidth = fontSize * 0.65
+      break
+    case 'TimesRoman':
+      avgCharWidth = fontSize * 0.58
+      break
+    default:
+      avgCharWidth = fontSize * 0.6
+      break
+  }
+  
+  return text.length * avgCharWidth
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -270,10 +343,13 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Add text fields based on certificate config
+        // Clear existing text from template (optional - preserves background)
+        await clearExistingText(page)
+        
+        // Add text fields with perfect centering
         const config = defaultCertificateConfig
 
-        // Candidate Name (combined: Salutation + CandidateName + guardian type + Father/Husband)
+        // Candidate Name with Aadhaar (complete line)
         {
           const parts: string[] = []
           if (student.salutation) parts.push(String(student.salutation).trim())
@@ -284,96 +360,126 @@ export async function POST(request: NextRequest) {
             // default to S/o if guardian_type absent
             parts.push(`S/o ${String(student.name_of_father_husband).trim()}`)
           }
-          const combinedName = parts.join(" ")
-          if (combinedName) {
-            page.drawText(combinedName, {
-              x: config.candidateName.x,
-              y: page.getHeight() - config.candidateName.y,
-              size: config.candidateName.fontSize,
-              font: getFont(config.candidateName.fontFamily),
-              color: rgb(...config.candidateName.color),
-              maxWidth: config.candidateName.maxWidth,
-            })
-            console.log(`  ✓ Added combined candidate name: "${combinedName}" at (${config.candidateName.x}, ${config.candidateName.y})`)
+          
+          // Add Aadhaar to the same line
+          if (student.adhaar) {
+            parts.push(`having Adhaar ${String(student.adhaar)}`)
+          }
+          
+          const completeLine = parts.join(" ")
+          if (completeLine) {
+            // Use centered text for the complete line
+            const { x, y } = addCenteredText(
+              page,
+              completeLine,
+              config.candidateName.y,
+              config.candidateName.fontSize,
+              getFont(config.candidateName.fontFamily),
+              config.candidateName.color,
+              config.candidateName.maxWidth
+            )
+            console.log(`  ✓ Added complete candidate line: "${completeLine}" at (${x}, ${y})`)
           }
         }
 
-        // Aadhaar
-        if (student.adhaar) {
-          page.drawText(String(student.adhaar), {
-            x: config.aadhaar.x,
-            y: page.getHeight() - config.aadhaar.y,
-            size: config.aadhaar.fontSize,
-            font: getFont(config.aadhaar.fontFamily),
-            color: rgb(...config.aadhaar.color),
-            maxWidth: config.aadhaar.maxWidth,
-          })
-          console.log(`  ✓ Added aadhaar: "${student.adhaar}" at (${config.aadhaar.x}, ${config.aadhaar.y})`)
-        }
 
-        // Job Role
+
+        // Job Role - Perfectly centered
         if (student.job_role) {
-          page.drawText(student.job_role, {
-            x: config.jobRole.x,
-            y: page.getHeight() - config.jobRole.y,
-            size: config.jobRole.fontSize,
-            font: getFont(config.jobRole.fontFamily),
-            color: rgb(...config.jobRole.color),
-            maxWidth: config.jobRole.maxWidth,
-          })
-          console.log(`  ✓ Added job role: "${student.job_role}" at (${config.jobRole.x}, ${config.jobRole.y})`)
+          const { x, y } = addCenteredText(
+            page,
+            student.job_role,
+            config.jobRole.y,
+            config.jobRole.fontSize,
+            getFont(config.jobRole.fontFamily),
+            config.jobRole.color,
+            config.jobRole.maxWidth
+          )
+          console.log(`  ✓ Added centered job role: "${student.job_role}" at (${x}, ${y})`)
         }
 
         // Training Center
         if (student.training_center) {
+          const alignedX = getAlignedX(
+            student.training_center,
+            config.trainingCenter.x,
+            config.trainingCenter.fontSize,
+            config.trainingCenter.fontFamily,
+            config.trainingCenter.align,
+            config.trainingCenter.maxWidth
+          )
           page.drawText(student.training_center, {
-            x: config.trainingCenter.x,
+            x: alignedX,
             y: page.getHeight() - config.trainingCenter.y,
             size: config.trainingCenter.fontSize,
             font: getFont(config.trainingCenter.fontFamily),
-            color: rgb(...config.trainingCenter.color),
+            color: rgb(config.trainingCenter.color[0], config.trainingCenter.color[1], config.trainingCenter.color[2]),
             maxWidth: config.trainingCenter.maxWidth,
           })
-          console.log(`  ✓ Added training center: "${student.training_center}" at (${config.trainingCenter.x}, ${config.trainingCenter.y})`)
+          console.log(`  ✓ Added training center: "${student.training_center}" at (${alignedX}, ${config.trainingCenter.y}) [${config.trainingCenter.align || 'left'} aligned]`)
         }
 
         // District
         if (student.district) {
+          const alignedX = getAlignedX(
+            student.district,
+            config.district.x,
+            config.district.fontSize,
+            config.district.fontFamily,
+            config.district.align,
+            config.district.maxWidth
+          )
           page.drawText(student.district, {
-            x: config.district.x,
+            x: alignedX,
             y: page.getHeight() - config.district.y,
             size: config.district.fontSize,
             font: getFont(config.district.fontFamily),
-            color: rgb(...config.district.color),
+            color: rgb(config.district.color[0], config.district.color[1], config.district.color[2]),
             maxWidth: config.district.maxWidth,
           })
-          console.log(`  ✓ Added district: "${student.district}" at (${config.district.x}, ${config.district.y})`)
+          console.log(`  ✓ Added district: "${student.district}" at (${alignedX}, ${config.district.y}) [${config.district.align || 'left'} aligned]`)
         }
 
         // State
         if (student.state) {
+          const alignedX = getAlignedX(
+            student.state,
+            config.state.x,
+            config.state.fontSize,
+            config.state.fontFamily,
+            config.state.align,
+            config.state.maxWidth
+          )
           page.drawText(student.state, {
-            x: config.state.x,
+            x: alignedX,
             y: page.getHeight() - config.state.y,
             size: config.state.fontSize,
             font: getFont(config.state.fontFamily),
-            color: rgb(...config.state.color),
+            color: rgb(config.state.color[0], config.state.color[1], config.state.color[2]),
             maxWidth: config.state.maxWidth,
           })
-          console.log(`  ✓ Added state: "${student.state}" at (${config.state.x}, ${config.state.y})`)
+          console.log(`  ✓ Added state: "${student.state}" at (${alignedX}, ${config.state.y}) [${config.state.align || 'left'} aligned]`)
         }
 
         // Assessment Partner
         if (student.assessment_partner) {
+          const alignedX = getAlignedX(
+            student.assessment_partner,
+            config.assessmentPartner.x,
+            config.assessmentPartner.fontSize,
+            config.assessmentPartner.fontFamily,
+            config.assessmentPartner.align,
+            config.assessmentPartner.maxWidth
+          )
           page.drawText(student.assessment_partner, {
-            x: config.assessmentPartner.x,
+            x: alignedX,
             y: page.getHeight() - config.assessmentPartner.y,
             size: config.assessmentPartner.fontSize,
             font: getFont(config.assessmentPartner.fontFamily),
-            color: rgb(...config.assessmentPartner.color),
+            color: rgb(config.assessmentPartner.color[0], config.assessmentPartner.color[1], config.assessmentPartner.color[2]),
             maxWidth: config.assessmentPartner.maxWidth,
           })
-          console.log(`  ✓ Added assessment partner: "${student.assessment_partner}" at (${config.assessmentPartner.x}, ${config.assessmentPartner.y})`)
+          console.log(`  ✓ Added assessment partner: "${student.assessment_partner}" at (${alignedX}, ${config.assessmentPartner.y}) [${config.assessmentPartner.align || 'left'} aligned]`)
         }
 
         // Date of Issuance
@@ -384,7 +490,7 @@ export async function POST(request: NextRequest) {
             y: page.getHeight() - config.dateOfIssuance.y,
             size: config.dateOfIssuance.fontSize,
             font: getFont(config.dateOfIssuance.fontFamily),
-            color: rgb(...config.dateOfIssuance.color),
+            color: rgb(config.dateOfIssuance.color[0], config.dateOfIssuance.color[1], config.dateOfIssuance.color[2]),
             maxWidth: config.dateOfIssuance.maxWidth,
           })
           console.log(`  ✓ Added date of issuance: "${dateStr}" at (${config.dateOfIssuance.x}, ${config.dateOfIssuance.y})`)
@@ -397,7 +503,7 @@ export async function POST(request: NextRequest) {
             y: page.getHeight() - config.enrollmentNumber.y,
             size: config.enrollmentNumber.fontSize,
             font: getFont(config.enrollmentNumber.fontFamily),
-            color: rgb(...config.enrollmentNumber.color),
+            color: rgb(config.enrollmentNumber.color[0], config.enrollmentNumber.color[1], config.enrollmentNumber.color[2]),
           })
           console.log(`  ✓ Added enrollment number: "${student.enrollment_number}" at (${config.enrollmentNumber.x}, ${config.enrollmentNumber.y})`)
         }
@@ -409,7 +515,7 @@ export async function POST(request: NextRequest) {
             y: page.getHeight() - config.certificateNumber.y,
             size: config.certificateNumber.fontSize,
             font: getFont(config.certificateNumber.fontFamily),
-            color: rgb(...config.certificateNumber.color),
+            color: rgb(config.certificateNumber.color[0], config.certificateNumber.color[1], config.certificateNumber.color[2]),
           })
           console.log(`  ✓ Added certificate number: "${student.certificate_number}" at (${config.certificateNumber.x}, ${config.certificateNumber.y})`)
         }

@@ -20,7 +20,6 @@ export async function POST(request: NextRequest) {
     const studentsData = students.map((student: any) => ({
       // Removed: salutation, guardian_type, name_of_father_husband
       candidate_name: student.candidate_name,
-      adhaar: student.adhaar || null,
       job_role: student.job_role,
       training_center: student.training_center || null,
       district: student.district || null,
