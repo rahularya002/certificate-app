@@ -1,5 +1,6 @@
 import "./globals.css"
 import type React from "react"
+import { PerformanceMonitor } from "@/components/ui/performance-monitor"
 
 export default function RootLayout({
   children,
@@ -8,7 +9,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <PerformanceMonitor />
+      </body>
     </html>
   )
 }

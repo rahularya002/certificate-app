@@ -71,7 +71,7 @@ export function GenerationPreview({ selectedStudents, selectedTemplate, onGenera
       }
 
       const result = await response.json()
-      setGeneratedCertificates(result.certificates)
+      setGeneratedCertificates(result.generatedCertificates || [])
       setProgress(100)
       onGenerate()
     } catch (error) {
@@ -82,7 +82,7 @@ export function GenerationPreview({ selectedStudents, selectedTemplate, onGenera
   }
 
   const handleDownloadAll = async () => {
-    if (generatedCertificates.length === 0) return
+    if (!generatedCertificates || generatedCertificates.length === 0) return
 
     try {
       const response = await fetch("/api/certificates/download-batch", {
@@ -91,7 +91,7 @@ export function GenerationPreview({ selectedStudents, selectedTemplate, onGenera
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          certificateIds: generatedCertificates.map((c) => c.id),
+          certificateIds: generatedCertificates.filter((c) => c.id).map((c) => c.id),
         }),
       })
 
@@ -161,10 +161,12 @@ export function GenerationPreview({ selectedStudents, selectedTemplate, onGenera
         )}
 
         {/* Success */}
-        {generatedCertificates.length > 0 && (
+        {generatedCertificates && generatedCertificates.length > 0 && (
           <Alert>
             <CheckCircle className="h-4 w-4" />
-            <AlertDescription>Successfully generated {generatedCertificates.length} certificates!</AlertDescription>
+            <AlertDescription>
+              Successfully generated {generatedCertificates.length} certificates!
+            </AlertDescription>
           </Alert>
         )}
 
@@ -184,7 +186,7 @@ export function GenerationPreview({ selectedStudents, selectedTemplate, onGenera
             )}
           </Button>
 
-          {generatedCertificates.length > 0 && (
+          {generatedCertificates && generatedCertificates.length > 0 && (
             <Button variant="outline" onClick={handleDownloadAll}>
               <Download className="h-4 w-4 mr-2" />
               Download All
@@ -193,14 +195,16 @@ export function GenerationPreview({ selectedStudents, selectedTemplate, onGenera
         </div>
 
         {/* Generated Certificates List */}
-        {generatedCertificates.length > 0 && (
+        {generatedCertificates && generatedCertificates.length > 0 && (
           <div className="space-y-2">
             <h4 className="text-sm font-medium">Generated Certificates:</h4>
             <div className="max-h-32 overflow-y-auto space-y-1">
               {generatedCertificates.map((cert: any) => (
-                <div key={cert.id} className="flex items-center justify-between text-sm p-2 rounded border">
-                  <span>{cert.student_name}</span>
-                  <span className="text-muted-foreground">{cert.certificate_number}</span>
+                <div key={cert.studentId} className="flex items-center justify-between text-sm p-2 rounded border">
+                  <span>{cert.studentName}</span>
+                  <div className="text-muted-foreground text-right">
+                    <div>{cert.certificateNumber}</div>
+                  </div>
                 </div>
               ))}
             </div>

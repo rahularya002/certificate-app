@@ -242,12 +242,23 @@ export function FileUpload() {
     setIsUploading(true)
     setProgress(0)
     setError(null)
+    setSuccess(false)
 
     try {
-      setProgress(25)
       const students = await parseExcelFile(file)
+      console.log(`📊 Parsed ${students.length} students from Excel file`)
 
-      setProgress(50)
+      if (students.length === 0) {
+        setError("No valid student data found in the file")
+        setIsUploading(false)
+        return
+      }
+
+      // Show progress for large files
+      if (students.length > 100) {
+        setProgress(10)
+      }
+
       const response = await fetch("/api/students/bulk-upload", {
         method: "POST",
         headers: {
@@ -256,24 +267,30 @@ export function FileUpload() {
         body: JSON.stringify({ students }),
       })
 
+      if (students.length > 100) {
+        setProgress(50)
+      }
+
+      const result = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to upload students")
+        throw new Error(result.error || "Upload failed")
       }
 
       setProgress(100)
       setSuccess(true)
       setShouldRefresh(true)
 
-      setTimeout(() => {
-        setFile(null)
-        setProgress(0)
-        setSuccess(false)
-        const input = document.getElementById("excel-file") as HTMLInputElement
-        if (input) input.value = ""
-      }, 2000)
+      console.log("✅ Upload successful:", result)
+      
+      // Show detailed results
+      if (result.errors && result.errors.length > 0) {
+        console.warn("⚠️ Some batches had errors:", result.errors)
+      }
+      
     } catch (error) {
-      setError(error instanceof Error ? error.message : "An error occurred")
+      console.error("❌ Upload error:", error)
+      setError(error instanceof Error ? error.message : "Upload failed")
     } finally {
       setIsUploading(false)
     }
@@ -324,7 +341,9 @@ export function FileUpload() {
         {success && (
           <Alert>
             <CheckCircle className="h-4 w-4" />
-            <AlertDescription>Students uploaded successfully!</AlertDescription>
+            <AlertDescription>
+              Students uploaded successfully! Check the console for detailed results.
+            </AlertDescription>
           </Alert>
         )}
 

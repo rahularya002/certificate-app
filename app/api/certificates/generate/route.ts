@@ -4,6 +4,10 @@ import { PDFDocument, rgb, StandardFonts, PDFPage } from "pdf-lib"
 import { defaultCertificateConfig, getAlignedX } from "@/lib/certificate-config"
 import QRCode from "qrcode"
 
+// Cache for template PDFs to avoid repeated downloads
+const templateCache = new Map<string, { pdfBytes: ArrayBuffer, timestamp: number }>()
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
 // Helper function to clear existing text from a PDF page
 async function clearExistingText(page: PDFPage) {
   try {
@@ -75,6 +79,77 @@ function getTextWidth(text: string, fontSize: number, fontFamily: string): numbe
   }
   
   return text.length * avgCharWidth
+}
+
+// Optimized function to get template PDF with caching
+async function getTemplatePDF(supabase: any, template: any): Promise<ArrayBuffer> {
+  const cacheKey = `${template.id}-${template.file_path}`
+  const cached = templateCache.get(cacheKey)
+  
+  // Check if we have a valid cached version
+  if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+    console.log("📦 Using cached template PDF")
+    return cached.pdfBytes
+  }
+
+  console.log("📥 Downloading fresh template PDF")
+  
+  // Get signed URL for the template PDF file
+  let signedUrlData, signedUrlError
+  try {
+    const result = await supabase.storage
+      .from("templates")
+      .createSignedUrl(template.file_path, 120)
+    signedUrlData = result.data
+    signedUrlError = result.error
+  } catch (e) {
+    console.log("Error with 'templates' bucket:", e)
+    signedUrlError = e
+  }
+
+  // If templates bucket fails, try certificates bucket
+  if (signedUrlError || !signedUrlData?.signedUrl) {
+    console.log("Trying 'certificates' bucket as fallback...")
+    try {
+      const result = await supabase.storage
+        .from("certificates")
+        .createSignedUrl(template.file_path, 120)
+      signedUrlData = result.data
+      signedUrlError = result.error
+    } catch (e) {
+      console.log("Error with 'certificates' bucket:", e)
+      signedUrlError = e
+    }
+  }
+
+  if (signedUrlError || !signedUrlData?.signedUrl) {
+    throw new Error("Failed to access template PDF")
+  }
+
+  const templateRes = await fetch(signedUrlData.signedUrl)
+  if (!templateRes.ok) {
+    throw new Error("Failed to download template PDF")
+  }
+  
+  const templatePdfBytes = await templateRes.arrayBuffer()
+  
+  // Cache the result
+  templateCache.set(cacheKey, { pdfBytes: templatePdfBytes, timestamp: Date.now() })
+  
+  return templatePdfBytes
+}
+
+// Optimized QR code generation with caching
+const qrCache = new Map<string, string>()
+async function generateQRCode(content: string): Promise<string> {
+  const cacheKey = content
+  if (qrCache.has(cacheKey)) {
+    return qrCache.get(cacheKey)!
+  }
+  
+  const qrDataUrl = await QRCode.toDataURL(content, { margin: 0, scale: 6 })
+  qrCache.set(cacheKey, qrDataUrl)
+  return qrDataUrl
 }
 
 export async function POST(request: NextRequest) {
@@ -202,93 +277,11 @@ export async function POST(request: NextRequest) {
       file_path: template.file_path 
     })
 
-    // Get signed URL for the template PDF file
-    console.log("=== Getting template PDF signed URL ===")
-    console.log("Template file_path:", template.file_path)
-    
-    // Try templates bucket first
-    let signedUrlData, signedUrlError
-    try {
-      const result = await supabase.storage
-        .from("templates")
-        .createSignedUrl(template.file_path, 120)
-      signedUrlData = result.data
-      signedUrlError = result.error
-      console.log("Tried 'templates' bucket first")
-    } catch (e) {
-      console.log("Error with 'templates' bucket:", e)
-      signedUrlError = e
-    }
+    // Get template PDF once and cache it
+    const templatePdfBytes = await getTemplatePDF(supabase, template)
+    console.log("Template PDF loaded, size:", templatePdfBytes.byteLength, "bytes")
 
-    // If templates bucket fails, try certificates bucket
-    if (signedUrlError || !signedUrlData?.signedUrl) {
-      console.log("Trying 'certificates' bucket as fallback...")
-      try {
-        const result = await supabase.storage
-          .from("certificates")
-          .createSignedUrl(template.file_path, 120)
-        signedUrlData = result.data
-        signedUrlError = result.error
-        console.log("Tried 'certificates' bucket as fallback")
-      } catch (e) {
-        console.log("Error with 'certificates' bucket:", e)
-        signedUrlError = e
-      }
-    }
-
-    console.log("Signed URL result:", { 
-      error: signedUrlError, 
-      hasSignedUrl: !!signedUrlData?.signedUrl,
-      filePath: template.file_path,
-      bucketsTried: ["templates", "certificates"]
-    })
-
-    if (signedUrlError || !signedUrlData?.signedUrl) {
-      // Let's also check what storage buckets exist and what files are in them
-      console.log("=== Checking available storage buckets ===")
-      try {
-        const { data: buckets } = await supabase.storage.listBuckets()
-        console.log("Available storage buckets:", buckets?.map(b => b.name))
-        
-        // Check what's in templates bucket
-        const { data: templatesFiles } = await supabase.storage
-          .from("templates")
-          .list("", { limit: 10 })
-        console.log("Files in 'templates' bucket:", templatesFiles)
-        
-        // Check what's in certificates bucket
-        const { data: certificatesFiles } = await supabase.storage
-          .from("certificates")
-          .list("", { limit: 10 })
-        console.log("Files in 'certificates' bucket:", certificatesFiles)
-      } catch (e) {
-        console.log("Error checking storage:", e)
-      }
-      
-      return NextResponse.json(
-        { error: "Failed to access template PDF" },
-        { status: 500 }
-      )
-    }
-
-    console.log("=== Downloading template PDF ===")
-    const templateRes = await fetch(signedUrlData.signedUrl)
-    console.log("Template PDF fetch result:", { 
-      ok: templateRes.ok, 
-      status: templateRes.status,
-      statusText: templateRes.statusText
-    })
-    
-    if (!templateRes.ok) {
-      return NextResponse.json(
-        { error: "Failed to download template PDF" },
-        { status: 500 }
-      )
-    }
-    const templatePdfBytes = await templateRes.arrayBuffer()
-    console.log("Template PDF downloaded, size:", templatePdfBytes.byteLength, "bytes")
-
-    // Prepare base PDF (loaded from template)
+    // Prepare base PDF (loaded from template) - do this once
     console.log("=== Loading template PDF into pdf-lib ===")
     const basePdfDoc = await PDFDocument.load(templatePdfBytes)
     console.log("Template PDF loaded successfully, pages:", basePdfDoc.getPageCount())
@@ -312,18 +305,40 @@ export async function POST(request: NextRequest) {
     }
 
     const generatedCertificates = []
+    const certificateRecords = []
     console.log("=== Starting certificate generation for", students.length, "students ===")
 
-    for (const student of students) {
+    // Generate unique certificate numbers for each student (including regeneration)
+    console.log("=== Generating unique certificate numbers ===")
+    
+    const certificateNumbers = []
+    for (let i = 0; i < students.length; i++) {
+      try {
+        const { data: certNumber } = await supabase.rpc('generate_certificate_number')
+        certificateNumbers.push(certNumber || `CERT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`)
+      } catch (error) {
+        // Fallback to timestamp-based number if RPC fails
+        const timestamp = Date.now()
+        const random = Math.random().toString(36).substr(2, 9)
+        certificateNumbers.push(`CERT-${timestamp}-${random}`)
+      }
+    }
+
+    for (let i = 0; i < students.length; i++) {
+      const student = students[i]
+      const certificateNumber = certificateNumbers[i]
+      
+      console.log(`Student ${student.candidate_name}: generating certificate with number ${certificateNumber}`)
+      
       try {
         console.log(`--- Generating certificate for student: ${student.candidate_name} (ID: ${student.id}) ---`)
         
-        // Clone the base template for each student
+        // Clone the base template for each student (more efficient than loading from bytes)
         const pdfDoc = await PDFDocument.load(await basePdfDoc.save())
         const pages = pdfDoc.getPages()
         const page = pages[0]
 
-        // Get fonts
+        // Get fonts (embed once per document)
         const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica)
         const helveticaBoldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
         const timesRomanFont = await pdfDoc.embedFont(StandardFonts.TimesRoman)
@@ -382,8 +397,6 @@ export async function POST(request: NextRequest) {
           }
         }
 
-
-
         // Job Role - Perfectly centered
         if (student.job_role) {
           const { x, y } = addCenteredText(
@@ -400,100 +413,54 @@ export async function POST(request: NextRequest) {
 
         // Training Center
         if (student.training_center) {
-          const alignedX = getAlignedX(
-            student.training_center,
-            config.trainingCenter.x,
-            config.trainingCenter.fontSize,
-            config.trainingCenter.fontFamily,
-            config.trainingCenter.align,
-            config.trainingCenter.maxWidth
-          )
           page.drawText(student.training_center, {
-            x: alignedX,
+            x: config.trainingCenter.x,
             y: page.getHeight() - config.trainingCenter.y,
             size: config.trainingCenter.fontSize,
             font: getFont(config.trainingCenter.fontFamily),
             color: rgb(config.trainingCenter.color[0], config.trainingCenter.color[1], config.trainingCenter.color[2]),
             maxWidth: config.trainingCenter.maxWidth,
           })
-          console.log(`  ✓ Added training center: "${student.training_center}" at (${alignedX}, ${config.trainingCenter.y}) [${config.trainingCenter.align || 'left'} aligned]`)
+          console.log(`  ✓ Added training center: "${student.training_center}" at (${config.trainingCenter.x}, ${config.trainingCenter.y})`)
         }
 
         // District
         if (student.district) {
-          const alignedX = getAlignedX(
-            student.district,
-            config.district.x,
-            config.district.fontSize,
-            config.district.fontFamily,
-            config.district.align,
-            config.district.maxWidth
-          )
           page.drawText(student.district, {
-            x: alignedX,
+            x: config.district.x,
             y: page.getHeight() - config.district.y,
             size: config.district.fontSize,
             font: getFont(config.district.fontFamily),
             color: rgb(config.district.color[0], config.district.color[1], config.district.color[2]),
             maxWidth: config.district.maxWidth,
           })
-          console.log(`  ✓ Added district: "${student.district}" at (${alignedX}, ${config.district.y}) [${config.district.align || 'left'} aligned]`)
+          console.log(`  ✓ Added district: "${student.district}" at (${config.district.x}, ${config.district.y})`)
         }
 
         // State
         if (student.state) {
-          const alignedX = getAlignedX(
-            student.state,
-            config.state.x,
-            config.state.fontSize,
-            config.state.fontFamily,
-            config.state.align,
-            config.state.maxWidth
-          )
           page.drawText(student.state, {
-            x: alignedX,
+            x: config.state.x,
             y: page.getHeight() - config.state.y,
             size: config.state.fontSize,
             font: getFont(config.state.fontFamily),
             color: rgb(config.state.color[0], config.state.color[1], config.state.color[2]),
             maxWidth: config.state.maxWidth,
           })
-          console.log(`  ✓ Added state: "${student.state}" at (${alignedX}, ${config.state.y}) [${config.state.align || 'left'} aligned]`)
+          console.log(`  ✓ Added state: "${student.state}" at (${config.state.x}, ${config.state.y})`)
         }
 
         // Assessment Partner
         if (student.assessment_partner) {
-          const alignedX = getAlignedX(
-            student.assessment_partner,
-            config.assessmentPartner.x,
-            config.assessmentPartner.fontSize,
-            config.assessmentPartner.fontFamily,
-            config.assessmentPartner.align,
-            config.assessmentPartner.maxWidth
-          )
           page.drawText(student.assessment_partner, {
-            x: alignedX,
+            x: config.assessmentPartner.x,
             y: page.getHeight() - config.assessmentPartner.y,
             size: config.assessmentPartner.fontSize,
             font: getFont(config.assessmentPartner.fontFamily),
             color: rgb(config.assessmentPartner.color[0], config.assessmentPartner.color[1], config.assessmentPartner.color[2]),
             maxWidth: config.assessmentPartner.maxWidth,
           })
-          console.log(`  ✓ Added assessment partner: "${student.assessment_partner}" at (${alignedX}, ${config.assessmentPartner.y}) [${config.assessmentPartner.align || 'left'} aligned]`)
-        }
-
-        // Date of Issuance
-        if (student.date_of_issuance) {
-          const dateStr = new Date(student.date_of_issuance).toLocaleDateString('en-IN')
-          page.drawText(dateStr, {
-            x: config.dateOfIssuance.x,
-            y: page.getHeight() - config.dateOfIssuance.y,
-            size: config.dateOfIssuance.fontSize,
-            font: getFont(config.dateOfIssuance.fontFamily),
-            color: rgb(config.dateOfIssuance.color[0], config.dateOfIssuance.color[1], config.dateOfIssuance.color[2]),
-            maxWidth: config.dateOfIssuance.maxWidth,
-          })
-          console.log(`  ✓ Added date of issuance: "${dateStr}" at (${config.dateOfIssuance.x}, ${config.dateOfIssuance.y})`)
+          console.log(`  ✓ Added assessment partner: "${student.assessment_partner}" at (${config.assessmentPartner.x}, ${config.assessmentPartner.y})`)
         }
 
         // Enrollment Number
@@ -520,6 +487,20 @@ export async function POST(request: NextRequest) {
           console.log(`  ✓ Added certificate number: "${student.certificate_number}" at (${config.certificateNumber.x}, ${config.certificateNumber.y})`)
         }
 
+        // Date of Issuance
+        if (student.date_of_issuance) {
+          const formattedDate = new Date(student.date_of_issuance).toLocaleDateString('en-IN')
+          page.drawText(formattedDate, {
+            x: config.dateOfIssuance.x,
+            y: page.getHeight() - config.dateOfIssuance.y,
+            size: config.dateOfIssuance.fontSize,
+            font: getFont(config.dateOfIssuance.fontFamily),
+            color: rgb(config.dateOfIssuance.color[0], config.dateOfIssuance.color[1], config.dateOfIssuance.color[2]),
+            maxWidth: config.dateOfIssuance.maxWidth,
+          })
+          console.log(`  ✓ Added date of issuance: "${formattedDate}" at (${config.dateOfIssuance.x}, ${config.dateOfIssuance.y})`)
+        }
+
         // Build QR content text
         const qrTextLines = [
           `CERTIFICATE OF COMPLETION`,
@@ -531,8 +512,8 @@ export async function POST(request: NextRequest) {
         ]
         const qrContent = qrTextLines.join("\n")
 
-        // Generate QR as PNG data URL
-        const qrDataUrl = await QRCode.toDataURL(qrContent, { margin: 0, scale: 6 })
+        // Generate QR as PNG data URL (with caching)
+        const qrDataUrl = await generateQRCode(qrContent)
         const qrBase64 = qrDataUrl.split(",")[1] || ""
         const qrPngBytes = Uint8Array.from(Buffer.from(qrBase64, "base64"))
         const qrImage = await pdfDoc.embedPng(qrPngBytes)
@@ -572,82 +553,75 @@ export async function POST(request: NextRequest) {
         }
         console.log("  ✅ PDF uploaded successfully to:", filePath)
 
-        // Generate a new unique certificate number
-        const { data: certNumData } = await supabase
-          .rpc('generate_certificate_number')
-
-        const generatedCertNumber = certNumData || `CERT-${Date.now()}`
-
-        // Save certificate record to database (always insert a new one)
+        // Prepare certificate record for batch insert
         const certificateData = {
           student_id: student.id,
           template_id: template.id,
           file_path: filePath,
-          certificate_number: generatedCertNumber,
+          certificate_number: certificateNumber,
           qr_code_data: qrContent,
-          // Remove duplicate student data - we'll fetch from students table when needed
-          // enrollment_number: student.enrollment_number,
-          // date_of_issuance: student.date_of_issuance,
         }
 
-        console.log("  Saving certificate record (update-then-insert)...")
-        const { data: updatedRows, error: updErr } = await supabase
-          .from("certificates")
-          .update(certificateData)
-          .eq("student_id", student.id)
-          .eq("template_id", template.id)
-          .select("id")
-
-        let certificateId: string | null = null
-        if (updErr) {
-          console.log("  Update step error (may be no match):", updErr)
-        }
-
-        if (updatedRows && updatedRows.length > 0) {
-          certificateId = updatedRows[0].id
-          console.log("  ✅ Updated existing certificate id:", certificateId)
-        } else {
-          console.log("  No existing certificate, inserting new...")
-          const { data: inserted, error: insErr } = await supabase
-            .from("certificates")
-            .insert(certificateData)
-            .select("id")
-            .single()
-
-          if (insErr) {
-            console.error("  ❌ Insert error:", insErr)
-            continue
-          }
-          certificateId = inserted.id
-          console.log("  ✅ Inserted certificate id:", certificateId)
-        }
-
+        certificateRecords.push(certificateData)
+        // We'll add the certificate ID after database insertion
         generatedCertificates.push({
-          id: certificateId!,
+          studentId: student.id,
           studentName: student.candidate_name,
-          certificateNumber: certificateData.certificate_number,
+          filePath: filePath,
+          certificateNumber: certificateNumber,
+          // Temporary placeholder - will be updated after DB insertion
+          id: null,
         })
 
-        console.log(`  ✅ Certificate generation completed for ${student.candidate_name}`)
-
+        console.log(`  ✅ Certificate generated successfully for ${student.candidate_name}`)
       } catch (error) {
-        console.error(`❌ Error generating certificate for student ${student.id}:`, error)
+        console.error(`  ❌ Error generating certificate for ${student.candidate_name}:`, error)
         continue
       }
     }
 
+    // Batch insert all certificate records
+    console.log("=== Batch inserting certificate records ===")
+    let insertResults = []
+    if (certificateRecords.length > 0) {
+      // Insert all certificates as new versions (allows regeneration)
+      const { data: insertedData, error: insertError } = await supabase
+        .from("certificates")
+        .insert(certificateRecords)
+        .select()
+
+      if (insertError) {
+        console.error("❌ Batch insert error:", insertError)
+        return NextResponse.json(
+          { error: "Failed to save certificate records" },
+          { status: 500 }
+        )
+      }
+
+      insertResults = insertedData || []
+      console.log(`✅ Successfully inserted ${insertResults.length} certificate records (new versions)`)
+      
+      // Update generatedCertificates with actual certificate IDs
+      for (let i = 0; i < insertResults.length && i < generatedCertificates.length; i++) {
+        generatedCertificates[i].id = insertResults[i].id
+      }
+    }
+
     console.log("=== Certificate generation completed ===")
-    console.log("Total certificates generated:", generatedCertificates.length)
-    console.log("Generated certificates:", generatedCertificates)
+    console.log("Summary:", {
+      totalStudents: students.length,
+      generatedCertificates: generatedCertificates.length,
+      savedRecords: insertResults.length,
+    })
 
     return NextResponse.json({
       success: true,
-      message: `Generated ${generatedCertificates.length} certificates`,
-      certificates: generatedCertificates,
+      generatedCertificates,
+      totalGenerated: generatedCertificates.length,
+      totalStudents: students.length,
     })
-
   } catch (error) {
-    console.error("❌ Certificate generation error:", error)
+    console.error("Certificate generation error:", error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
