@@ -39,7 +39,12 @@ export function StudentSelector({ students, selectedStudents, onSelectionChange 
   const [courseFilter, setCourseFilter] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
 
-  const filteredStudents = students.filter((student) => {
+  // Normalize students input in case caller passes an API payload like { students: [...] }
+  const allStudents: Student[] = Array.isArray(students)
+    ? students
+    : ((students as unknown as { students?: Student[] })?.students ?? [])
+
+  const filteredStudents = allStudents.filter((student) => {
     const matchesSearch =
       student.candidate_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.enrollment_number.toLowerCase().includes(searchTerm.toLowerCase())
@@ -53,7 +58,7 @@ export function StudentSelector({ students, selectedStudents, onSelectionChange 
   const endIndex = startIndex + ITEMS_PER_PAGE
   const currentPageStudents = filteredStudents.slice(startIndex, endIndex)
 
-  const uniqueCourses = Array.from(new Set(students.map((s) => s.job_role)))
+  const uniqueCourses = Array.from(new Set(allStudents.map((s) => s.job_role)))
 
   const handleStudentToggle = (student: Student, checked: boolean) => {
     if (checked) {
