@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal, Search, Edit, Trash2 } from "lucide-react"
 
@@ -28,9 +29,21 @@ interface Student {
 
 interface StudentsTableProps {
   students: Student[]
+  selectedStudents: string[]
+  onSelectAll: (checked: boolean) => void
+  onSelectStudent: (studentId: string, checked: boolean) => void
+  isAllSelected: boolean
+  isIndeterminate: boolean
 }
 
-export function StudentsTable({ students }: StudentsTableProps) {
+export function StudentsTable({ 
+  students, 
+  selectedStudents, 
+  onSelectAll, 
+  onSelectStudent, 
+  isAllSelected, 
+  isIndeterminate 
+}: StudentsTableProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
 
@@ -82,6 +95,12 @@ export function StudentsTable({ students }: StudentsTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[50px]">
+                <Checkbox
+                  checked={isAllSelected ? true : isIndeterminate ? "indeterminate" : false}
+                  onCheckedChange={(value) => onSelectAll(Boolean(value))}
+                />
+              </TableHead>
               <TableHead>Candidate Name</TableHead>
               <TableHead>Enrollment Number</TableHead>
               <TableHead>Job Role</TableHead>
@@ -94,13 +113,19 @@ export function StudentsTable({ students }: StudentsTableProps) {
           <TableBody>
             {filteredStudents.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No students found
                 </TableCell>
               </TableRow>
             ) : (
               filteredStudents.map((student) => (
                 <TableRow key={student.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedStudents.includes(student.id)}
+                      onCheckedChange={(checked) => onSelectStudent(student.id, Boolean(checked))}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{student.candidate_name}</TableCell>
                   <TableCell>{student.enrollment_number}</TableCell>
                   <TableCell>{student.job_role}</TableCell>
